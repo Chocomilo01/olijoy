@@ -18,7 +18,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["http://localhost:3000", "https://olijoy.onrender.com"],
+    origin: ["http://localhost:3000", "https://olijoyft-tsoi.vercel.app"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: [
@@ -28,7 +28,7 @@ app.use(
       "Accept",
       "Authorization",
     ],
-  })
+  }),
 );
 app.use(errorHandler)
 
