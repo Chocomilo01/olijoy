@@ -18,8 +18,7 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["https://www.olijoyuniquebc.com",
-      "https://olijoyuniquebc.com",
+    origin: ["https://olijoyuniquebc.com",
       "http://localhost:3000"],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
