@@ -2,7 +2,6 @@ const TransactionService = require("../services/transactionService");
 const CustomerService = require("../services/customerService");
 const { sendSMS } = require("../services/smsService");
 
-
 class TransactionController {
   // Inside the createDeposit method
   async createDeposit(req, res) {
@@ -29,7 +28,7 @@ class TransactionController {
       }
 
       // Fetch user information (user ID and user name) from your authentication system or user service
-      
+
       // The information here would be better gotten from the jwt token
       const userId = req.body.id;
       const firstName = req.body.firstName;
@@ -43,12 +42,24 @@ class TransactionController {
 
       const updatedBalance = customer.accountBalance;
 
-      await sendSMS(
-        customer.customersPhoneNo,
-        `Dear ${customer.name}, your account has been credited with NGN ${depositAmount}. Available Balance: NGN ${updatedBalance}.`,
-      );
+      try {
+        await sendSMS(
+          customer.customersPhoneNo,
+          `OLJ UNIQUE
 
-       // Create a deposit transaction
+Dear ${customer.name},
+
+Your account ${customer.accountNumber} has been credited with NGN ${depositAmount}.
+
+Available Balance: NGN ${updatedBalance}.
+
+Thank you.`,
+        );
+      } catch (err) {
+        console.log("Deposit SMS failed:", err.message);
+      }
+
+      // Create a deposit transaction
       const depositTransaction = await TransactionService.create({
         type: "deposit",
         amount: depositAmount, // Use the parsed amount here
@@ -77,23 +88,25 @@ class TransactionController {
       return res.status(201).json({
         success: true,
         message: "Deposit created successfully",
-        data: responsePayload
+        data: responsePayload,
       });
     } catch (error) {
       if (error.code === 11000 && error.keyPattern) {
         // Check if the error is a duplicate key error
         const keys = Object.keys(error.keyPattern);
-        const duplicateFields = keys.map(key => key.charAt(0).toUpperCase() + key.slice(1));
-        const errorMessage = `Duplicate ${duplicateFields.join(', ')} found. Please ensure uniqueness.`;
+        const duplicateFields = keys.map(
+          (key) => key.charAt(0).toUpperCase() + key.slice(1),
+        );
+        const errorMessage = `Duplicate ${duplicateFields.join(", ")} found. Please ensure uniqueness.`;
         return res.status(400).json({
           success: false,
-          message: errorMessage
+          message: errorMessage,
         });
       } else {
         return res.status(500).json({
           success: false,
           message: "Error creating deposit",
-          error: error.message
+          error: error.message,
         });
       }
     }
@@ -108,10 +121,16 @@ class TransactionController {
 
   async createWithdrawal(req, res) {
     try {
-      const { 
-        customerId, 
-        amount, 
-        description, paymentDate, collectedBy, uploadedBy, modeOfPayment, name } = req.body;
+      const {
+        customerId,
+        amount,
+        description,
+        paymentDate,
+        collectedBy,
+        uploadedBy,
+        modeOfPayment,
+        name,
+      } = req.body;
 
       // Verify that the customer exists
       const customer = await CustomerService.fetchOne({ _id: customerId });
@@ -137,17 +156,32 @@ class TransactionController {
       const firstName = req.body.firstNameame;
       const middleName = req.body.middleNameame; // Replace with how you retrieve the user name
 
-
       // Update the customer's account balance
       customer.accountBalance -= amount;
       await customer.save();
 
       const updatedBalance = customer.accountBalance;
 
-      await sendSMS(
-        customer.customersPhoneNo,
-        `Dear ${customer.name}, your account has been debited with NGN ${amount}. Available Balance: NGN ${updatedBalance}.`,
-      );
+      try {
+        await sendSMS(
+          customer.customersPhoneNo,
+          `OLJ UNIQUE
+
+Dear ${customer.name},
+
+Your account ${customer.accountNumber} has been debited with NGN ${amount}.
+
+Available Balance: NGN ${updatedBalance}.
+
+Thank you.`,
+        );
+      } catch (error) {
+        console.error("========== TERMII ERROR ==========");
+        console.error(error.response?.data || error.message);
+        console.error("==================================");
+
+        throw error;
+      }
 
       // Create a withdrawal transaction with user information
       const withdrawalTransaction = await TransactionService.createWithdrawal({
@@ -199,10 +233,10 @@ class TransactionController {
   //   try {
   //     const { id } = req.params; // Transaction ID
   //     const updateData = req.body; // Data to update
-  
+
   //     // Call the service to update the transaction
   //     const updatedTransaction = await TransactionService.updateTransaction(id, updateData);
-  
+
   //     return res.status(200).json({
   //       success: true,
   //       message: "Transaction updated successfully",
@@ -234,91 +268,92 @@ class TransactionController {
       });
     }
   }
-async getAllWithdrawals(req, res) {
-  try {
-    // Get parameters from query string
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-    const { startDate, endDate, modeOfPayment, collectedBy, uploadedBy } = req.query;
-    
-    // Validate pagination parameters
-    if (page < 1 || limit < 1 || limit > 100) {
-      return res.status(400).json({
+  async getAllWithdrawals(req, res) {
+    try {
+      // Get parameters from query string
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const { startDate, endDate, modeOfPayment, collectedBy, uploadedBy } =
+        req.query;
+
+      // Validate pagination parameters
+      if (page < 1 || limit < 1 || limit > 100) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Invalid pagination parameters. Page must be ≥ 1, limit must be between 1-100",
+        });
+      }
+
+      const skip = (page - 1) * limit;
+
+      // Build filter object
+      const filter = { type: "withdrawal" };
+
+      // Add date filter if provided
+      if (startDate && endDate) {
+        filter.paymentDate = {
+          $gte: new Date(startDate),
+          $lte: new Date(endDate),
+        };
+      }
+
+      // Add modeOfPayment filter if provided
+      if (modeOfPayment && ["cash", "transfer"].includes(modeOfPayment)) {
+        filter.modeOfPayment = modeOfPayment;
+      }
+
+      // Add collectedBy filter if provided
+      if (collectedBy) {
+        filter.collectedBy = { $regex: collectedBy, $options: "i" };
+      }
+
+      // Add uploadedBy filter if provided
+      if (uploadedBy) {
+        filter.uploadedBy = { $regex: uploadedBy, $options: "i" };
+      }
+
+      // Call the service with filters
+      const [withdrawals, total] = await Promise.all([
+        TransactionService.getAllWithdrawalsPaginated(filter, skip, limit),
+        TransactionService.countAllWithdrawals(filter),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "Withdrawal transactions retrieved successfully",
+        data: withdrawals,
+        pagination: {
+          total,
+          page,
+          limit,
+          pages: Math.ceil(total / limit),
+          hasNext: page < Math.ceil(total / limit),
+          hasPrev: page > 1,
+        },
+        filters: {
+          startDate,
+          endDate,
+          modeOfPayment,
+          collectedBy,
+          uploadedBy,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
         success: false,
-        message: "Invalid pagination parameters. Page must be ≥ 1, limit must be between 1-100",
+        message: "Error retrieving withdrawal transactions",
+        error: error.message,
       });
     }
-
-    const skip = (page - 1) * limit;
-
-    // Build filter object
-    const filter = { type: "withdrawal" };
-    
-    // Add date filter if provided
-    if (startDate && endDate) {
-      filter.paymentDate = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
-    }
-    
-    // Add modeOfPayment filter if provided
-    if (modeOfPayment && ['cash', 'transfer'].includes(modeOfPayment)) {
-      filter.modeOfPayment = modeOfPayment;
-    }
-    
-    // Add collectedBy filter if provided
-    if (collectedBy) {
-      filter.collectedBy = { $regex: collectedBy, $options: "i" };
-    }
-    
-    // Add uploadedBy filter if provided
-    if (uploadedBy) {
-      filter.uploadedBy = { $regex: uploadedBy, $options: "i" };
-    }
-
-    // Call the service with filters
-    const [withdrawals, total] = await Promise.all([
-      TransactionService.getAllWithdrawalsPaginated(filter, skip, limit),
-      TransactionService.countAllWithdrawals(filter)
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      message: "Withdrawal transactions retrieved successfully",
-      data: withdrawals,
-      pagination: {
-        total,
-        page,
-        limit,
-        pages: Math.ceil(total / limit),
-        hasNext: page < Math.ceil(total / limit),
-        hasPrev: page > 1
-      },
-      filters: {
-        startDate,
-        endDate,
-        modeOfPayment,
-        collectedBy,
-        uploadedBy
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error retrieving withdrawal transactions",
-      error: error.message,
-    });
   }
-}
   async getWithdrawalById(req, res) {
     try {
       const withdrawalId = req.params.withdrawalId;
 
       // Query the database for the withdrawal transaction with the specified ID
-      const withdrawal = await TransactionService.getWithdrawalById(
-        withdrawalId
-      );
+      const withdrawal =
+        await TransactionService.getWithdrawalById(withdrawalId);
 
       if (!withdrawal) {
         return res.status(404).json({
@@ -370,7 +405,7 @@ async getAllWithdrawals(req, res) {
   async searchTransactionsByPaymentDate(req, res) {
     try {
       const { startDate, endDate } = req.query;
-  
+
       // Check if startDate and endDate are provided
       if (!startDate || !endDate) {
         return res.status(400).json({
@@ -382,13 +417,14 @@ async getAllWithdrawals(req, res) {
       // Parse the input date strings into JavaScript Date objects
       const parsedStartDate = new Date(startDate);
       const parsedEndDate = new Date(endDate);
-  
+
       // Call the service method to search transactions by payment date
-      const transactions = await TransactionService.searchTransactionsByPaymentDate(
-        parsedStartDate,
-        parsedEndDate
-      );
-  
+      const transactions =
+        await TransactionService.searchTransactionsByPaymentDate(
+          parsedStartDate,
+          parsedEndDate,
+        );
+
       // Return the transactions in the response
       return res.status(200).json({
         success: true,
@@ -403,7 +439,6 @@ async getAllWithdrawals(req, res) {
       });
     }
   }
-  
 
   async searchTransactionsByDate(req, res) {
     try {
@@ -429,7 +464,7 @@ async getAllWithdrawals(req, res) {
       // Use the TransactionService to search transactions by date range
       const transactions = await TransactionService.searchTransactionsByDate(
         searchDate,
-        endDate
+        endDate,
       );
 
       // Return the transactions in the response
@@ -450,7 +485,7 @@ async getAllWithdrawals(req, res) {
   async getTotalDepositByTransferByPaymentDate(req, res) {
     try {
       const { startDate, endDate } = req.query;
-      
+
       // Check if startDate and endDate are provided
       if (!startDate || !endDate) {
         return res.status(400).json({
@@ -462,17 +497,19 @@ async getAllWithdrawals(req, res) {
       // Parse the input date strings into JavaScript Date objects
       const parsedStartDate = new Date(startDate);
       const parsedEndDate = new Date(endDate);
-      
+
       // Call the service method to retrieve total deposit transactions made by transfer by payment date
-      const totalDepositAmount = await TransactionService.getTotalDepositByTransferByPaymentDate(
-        parsedStartDate,
-        parsedEndDate
-      );
+      const totalDepositAmount =
+        await TransactionService.getTotalDepositByTransferByPaymentDate(
+          parsedStartDate,
+          parsedEndDate,
+        );
 
       // Return the total deposit amount in the response
       return res.status(200).json({
         success: true,
-        message: "Total deposit transactions made by transfer retrieved successfully",
+        message:
+          "Total deposit transactions made by transfer retrieved successfully",
         data: {
           totalDepositAmount,
         },
@@ -480,7 +517,8 @@ async getAllWithdrawals(req, res) {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "Error retrieving total deposit transactions by transfer by payment date",
+        message:
+          "Error retrieving total deposit transactions by transfer by payment date",
         error: error.message,
       });
     }
@@ -489,7 +527,7 @@ async getAllWithdrawals(req, res) {
   async getTotalDepositByCashByPaymentDate(req, res) {
     try {
       const { startDate, endDate } = req.query;
-  
+
       // Check if startDate and endDate are provided
       if (!startDate || !endDate) {
         return res.status(400).json({
@@ -497,21 +535,23 @@ async getAllWithdrawals(req, res) {
           message: "Please provide both startDate and endDate for the search.",
         });
       }
-  
+
       // Parse the input date strings into JavaScript Date objects
       const parsedStartDate = new Date(startDate);
       const parsedEndDate = new Date(endDate);
-  
+
       // Call the service method to retrieve total deposit transactions made by cash by payment date
-      const totalDepositAmount = await TransactionService.getTotalDepositByCashByPaymentDate(
-        parsedStartDate,
-        parsedEndDate
-      );
-  
+      const totalDepositAmount =
+        await TransactionService.getTotalDepositByCashByPaymentDate(
+          parsedStartDate,
+          parsedEndDate,
+        );
+
       // Return the total deposit amount in the response
       return res.status(200).json({
         success: true,
-        message: "Total deposit transactions made by cash retrieved successfully",
+        message:
+          "Total deposit transactions made by cash retrieved successfully",
         data: {
           totalDepositAmount,
         },
@@ -519,86 +559,91 @@ async getAllWithdrawals(req, res) {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "Error retrieving total deposit transactions by cash by payment date",
+        message:
+          "Error retrieving total deposit transactions by cash by payment date",
         error: error.message,
       });
     }
   }
 
+  async getTotalWithdrawalsByTransferByPaymentDate(req, res) {
+    try {
+      const { startDate, endDate } = req.query;
 
-    async getTotalWithdrawalsByTransferByPaymentDate(req, res) {
-      try {
-        const { startDate, endDate } = req.query;
-  
-        if (!startDate || !endDate) {
-          return res.status(400).json({
-            success: false,
-            message: "Please provide both startDate and endDate for the search.",
-          });
-        }
-  
-        const totalWithdrawalsAmount = await TransactionService.getTotalWithdrawalsByTransferByPaymentDate(
+      if (!startDate || !endDate) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide both startDate and endDate for the search.",
+        });
+      }
+
+      const totalWithdrawalsAmount =
+        await TransactionService.getTotalWithdrawalsByTransferByPaymentDate(
           new Date(startDate),
-          new Date(endDate)
+          new Date(endDate),
         );
-  
-        return res.status(200).json({
-          success: true,
-          message: "Total withdrawal transactions made by transfer retrieved successfully",
-          data: {
-            totalWithdrawalsAmount,
-          },
-        });
-      } catch (error) {
-        return res.status(500).json({
-          success: false,
-          message: "Error retrieving total withdrawal transactions by transfer by payment date",
-          error: error.message,
-        });
-      }
-    }
 
-    async getTotalWithdrawalsByCashByPaymentDate(req, res) {
-      try {
-        const { startDate, endDate } = req.query;
-  
-        // Check if startDate and endDate are provided
-        if (!startDate || !endDate) {
-          return res.status(400).json({
-            success: false,
-            message: "Please provide both startDate and endDate for the search.",
-          });
-        }
-  
-        // Parse the input date strings into JavaScript Date objects
-        const parsedStartDate = new Date(startDate);
-        const parsedEndDate = new Date(endDate);
-        console.log(parsedStartDate, parsedEndDate)
-  
-        // Call the service method to retrieve total withdrawal transactions made by cash by payment date
-        const totalWithdrawalsAmount = await TransactionService.getTotalWithdrawalsByCashByPaymentDate(
-          parsedStartDate,
-          parsedEndDate
-        );
-  
-        // Return the total withdrawal amount in the response
-        return res.status(200).json({
-          success: true,
-          message: "Total withdrawal transactions made by cash retrieved successfully",
-          data: {
-            totalWithdrawalsAmount,
-          },
-        });
-      } catch (error) {
-        return res.status(500).json({
+      return res.status(200).json({
+        success: true,
+        message:
+          "Total withdrawal transactions made by transfer retrieved successfully",
+        data: {
+          totalWithdrawalsAmount,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "Error retrieving total withdrawal transactions by transfer by payment date",
+        error: error.message,
+      });
+    }
+  }
+
+  async getTotalWithdrawalsByCashByPaymentDate(req, res) {
+    try {
+      const { startDate, endDate } = req.query;
+
+      // Check if startDate and endDate are provided
+      if (!startDate || !endDate) {
+        return res.status(400).json({
           success: false,
-          message: "Error retrieving total withdrawal transactions by cash by payment date",
-          error: error.message,
+          message: "Please provide both startDate and endDate for the search.",
         });
       }
+
+      // Parse the input date strings into JavaScript Date objects
+      const parsedStartDate = new Date(startDate);
+      const parsedEndDate = new Date(endDate);
+      console.log(parsedStartDate, parsedEndDate);
+
+      // Call the service method to retrieve total withdrawal transactions made by cash by payment date
+      const totalWithdrawalsAmount =
+        await TransactionService.getTotalWithdrawalsByCashByPaymentDate(
+          parsedStartDate,
+          parsedEndDate,
+        );
+
+      // Return the total withdrawal amount in the response
+      return res.status(200).json({
+        success: true,
+        message:
+          "Total withdrawal transactions made by cash retrieved successfully",
+        data: {
+          totalWithdrawalsAmount,
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message:
+          "Error retrieving total withdrawal transactions by cash by payment date",
+        error: error.message,
+      });
     }
-  
-  
+  }
+
   async getAllWithdrawalsByPaymentDate(req, res) {
     try {
       const { startDate, endDate } = req.query;
@@ -616,15 +661,17 @@ async getAllWithdrawals(req, res) {
       const parsedEndDate = new Date(endDate);
 
       // Call the new service method to retrieve all withdrawal transactions by payment date
-      const withdrawalTransactions = await TransactionService.getAllWithdrawalsByPaymentDate(
-        parsedStartDate,
-        parsedEndDate
-      );
+      const withdrawalTransactions =
+        await TransactionService.getAllWithdrawalsByPaymentDate(
+          parsedStartDate,
+          parsedEndDate,
+        );
 
       // Return the withdrawal transactions in the response
       return res.status(200).json({
         success: true,
-        message: "All withdrawal transactions by payment date retrieved successfully",
+        message:
+          "All withdrawal transactions by payment date retrieved successfully",
         data: withdrawalTransactions,
       });
     } catch (error) {
@@ -652,10 +699,11 @@ async getAllWithdrawals(req, res) {
       const parsedEndDate = new Date(endDate);
 
       // Call the service method to retrieve total deposit transactions by payment date
-      const totalDepositAmount = await TransactionService.getTotalDepositByPaymentDate(
-        parsedStartDate,
-        parsedEndDate
-      );
+      const totalDepositAmount =
+        await TransactionService.getTotalDepositByPaymentDate(
+          parsedStartDate,
+          parsedEndDate,
+        );
 
       // Return the total deposit amount in the response
       return res.status(200).json({
@@ -674,81 +722,88 @@ async getAllWithdrawals(req, res) {
     }
   }
 
-
-async getAllTransactions(req, res) {
-  try {
-    // Default values if none provided
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 10;
-
-    // Calculate skip value
-    const skip = (page - 1) * limit;
-
-    // Fetch paginated data and total count
-    const [transactions, total] = await Promise.all([
-      TransactionService.getAllTransactionsPaginated(skip, limit),
-      TransactionService.countAllTransactions()
-    ]);
-
-    return res.status(200).json({
-      success: true,
-      message: "Transactions retrieved successfully",
-      data: transactions,
-      pagination: {
-        total,
-        page,
-        pages: Math.ceil(total / limit)
-      }
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error retrieving transactions",
-      error: error.message
-    });
-  }
-}
-
-async getAllTransactionsByCash(req, res) {
-  try {
-    // Call the service to get all transactions with modeOfPayment set to 'cash'
-    const cashTransactions = await TransactionService.getAllTransactionsByCash();
-
-    return res.status(200).json({
-      success: true,
-      message: "All transactions by cash retrieved successfully",
-      data: cashTransactions,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error retrieving transactions by cash",
-      error: error.message,
-    });
-  }
-}
-
-async getAllTransactionsByTransfer(req, res) {
-  try {
-    // Call the service to get all transactions with modeOfPayment set to 'transfer'
-    const transferTransactions = await TransactionService.getAllTransactionsByTransfer();
-
-    return res.status(200).json({
-      success: true,
-      message: "All transactions by transfer retrieved successfully",
-      data: transferTransactions,
-    });
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      message: "Error retrieving transactions by transfer",
-      error: error.message,
-    });
-  }
-}
- async getAllTransactionsByUploader(req, res) {
+  async getAllTransactions(req, res) {
     try {
-      const { uploadedBy, page = 1, limit = 50, startDate, endDate } = req.query;
+      // Default values if none provided
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+
+      // Calculate skip value
+      const skip = (page - 1) * limit;
+
+      // Fetch paginated data and total count
+      const [transactions, total] = await Promise.all([
+        TransactionService.getAllTransactionsPaginated(skip, limit),
+        TransactionService.countAllTransactions(),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: "Transactions retrieved successfully",
+        data: transactions,
+        pagination: {
+          total,
+          page,
+          pages: Math.ceil(total / limit),
+        },
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Error retrieving transactions",
+        error: error.message,
+      });
+    }
+  }
+
+  async getAllTransactionsByCash(req, res) {
+    try {
+      // Call the service to get all transactions with modeOfPayment set to 'cash'
+      const cashTransactions =
+        await TransactionService.getAllTransactionsByCash();
+
+      return res.status(200).json({
+        success: true,
+        message: "All transactions by cash retrieved successfully",
+        data: cashTransactions,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Error retrieving transactions by cash",
+        error: error.message,
+      });
+    }
+  }
+
+  async getAllTransactionsByTransfer(req, res) {
+    try {
+      // Call the service to get all transactions with modeOfPayment set to 'transfer'
+      const transferTransactions =
+        await TransactionService.getAllTransactionsByTransfer();
+
+      return res.status(200).json({
+        success: true,
+        message: "All transactions by transfer retrieved successfully",
+        data: transferTransactions,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: "Error retrieving transactions by transfer",
+        error: error.message,
+      });
+    }
+  }
+  async getAllTransactionsByUploader(req, res) {
+    try {
+      const {
+        uploadedBy,
+        page = 1,
+        limit = 50,
+        startDate,
+        endDate,
+      } = req.query;
 
       if (!uploadedBy) {
         return res.status(400).json({
@@ -796,9 +851,15 @@ async getAllTransactionsByTransfer(req, res) {
       });
     }
   }
- async getAllTransactionsByCollector(req, res) {
+  async getAllTransactionsByCollector(req, res) {
     try {
-      const { collectedBy, page = 1, limit = 50, startDate, endDate } = req.query;
+      const {
+        collectedBy,
+        page = 1,
+        limit = 50,
+        startDate,
+        endDate,
+      } = req.query;
 
       if (!collectedBy) {
         return res.status(400).json({
@@ -860,7 +921,8 @@ async getAllTransactionsByTransfer(req, res) {
       }
 
       // Call the service method to retrieve all transactions for a customer
-      const transactions = await TransactionService.getAllTransactionsByCustomer(customerId);
+      const transactions =
+        await TransactionService.getAllTransactionsByCustomer(customerId);
 
       return res.status(200).json({
         success: true,
@@ -875,10 +937,6 @@ async getAllTransactionsByTransfer(req, res) {
       });
     }
   }
-  
-
-
 }
-
 
 module.exports = new TransactionController();

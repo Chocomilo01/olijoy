@@ -17,8 +17,7 @@ const customerSchema = require("../schema/customer.schema");
  */
 router.post(
   "/",
-  authenticate,
-  admin_managerAuthorizer,
+  
   validate(customerSchema),
   customerController.createCustomer,
 );
@@ -26,7 +25,7 @@ router.post(
 /**
  * Fetch All Customers
  */
-router.get("/", authenticate, customerController.fetchCustomers);
+router.get("/",  customerController.fetchCustomers);
 
 /**
  * Search Customers

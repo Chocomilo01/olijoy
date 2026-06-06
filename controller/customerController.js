@@ -7,309 +7,351 @@ const  { generateUniqueAccountNumber } = require("../utils/uniqueNumber")
 const CustomerModel = require("../model/customerModel");
 const customerService = require("../services/customerService");
 
+const TransactionModel = require("../model/transactionModel");
+const formatPhone = require("../utils/phoneFormatter");
+
 
 class CustomerController {
-    async createCustomer(req, res) {
-      const customer = req.body;
-      const picturePath = req.body.picturePath; // Assuming you're passing the path to the picture in the request body
-      
-      try {
-        // Generate a unique account number
-        const accountNumber = generateUniqueAccountNumber();
-        console.log('Generated Account Number:', accountNumber);
-  
-        // Check if a customer with that account number already exists
-        const existingCustomer = await CustomerService.fetchOne({ accountNumber });
-  
-        // this setting is wrong if an acc number is already selected \
-        //    another one should be generated on auto
-        if (existingCustomer) {
-          return res.status(403).json({
-            success: false,
-            message: 'Customer with this account number already exists',
-          });
-        }
-  
-        // Add the account number to the customer data
-        customer.accountNumber = accountNumber;
-        if (picturePath) {
-          customer.picture = fs.readFileSync(picturePath);
-      }
-        // Create a new customer document using the Mongoose service
-        const createdCustomer = await customerService.create({...customer})
+  // CREATE CUSTOMER
+  async createCustomer(req, res) {
+    try {
+      const customer = { ...req.body };
+      const picturePath = req.body.picturePath;
 
-        return res.status(201).json({
-          success: true,
-          message: 'Customer Created Successfully',
-          data: createdCustomer,
+      // Generate unique account number
+      let accountNumber;
+      let existingCustomer;
+
+      do {
+        accountNumber = generateUniqueAccountNumber();
+
+        existingCustomer = await CustomerService.fetchOne({
           accountNumber,
         });
-      } catch (error) {
-          return res.status(500).json({
-            success: false,
-            message: 'Error creating customer',
-            error: error.message,
-          });
+      } while (existingCustomer);
+
+      customer.accountNumber = accountNumber;
+
+      // Format phone number
+      if (customer.customersPhoneNo) {
+        customer.customersPhoneNo = formatPhone(customer.customersPhoneNo);
       }
-    }
 
-//     async updateCustomer(req, res) {
-//     try {
-//         const updateData = req.body;
-//         const customerId = req.params.id;
-//         const picturePath = req.body.picturePath; // Assuming you're passing the path to the picture in the request body
+      // Check duplicate BVN
+      if (customer.bvn) {
+        const existingBVN = await CustomerModel.findOne({
+          bvn: customer.bvn,
+        });
 
-//         // Fetch the user with the id
-//         const existingCustomer = await CustomerService.fetchOne({ _id: customerId });
-//         if (!existingCustomer) {
-//             return res.status(403).json({
-//                 success: false,
-//                 message: 'Customer not found'
-//             });
-//         }
-
-//         // Check if picture path exists in update data
-//         if (picturePath) {
-//             updateData.picture = fs.readFileSync(picturePath);
-//         }
-
-//         if (updateData.name) {
-//             const existingCustomerWithUpdateName = await CustomerService.fetchOne({
-//                 name: updateData.name.toLowerCase()
-//             });
-
-//             // Ensure existingCustomerWithUpdateName is not null and is not the same customer being updated
-//             if (existingCustomerWithUpdateName && existingCustomerWithUpdateName._id.toString() !== customerId) {
-//                 return res.status(403).json({
-//                     success: false,
-//                     message: 'Customer with that title already exists'
-//                 });
-//             }
-//         }
-
-//         // Update the customer data
-//         const updatedData = await CustomerService.update(customerId, updateData);
-//         res.status(200).json({
-//             success: true,
-//             message: 'Customer updated successfully',
-//             data: updatedData
-//         });
-
-//     } catch (error) {
-//         // Handle any unexpected errors
-//         res.status(500).json({
-//             success: false,
-//             message: 'An error occurred while updating the customer',
-//             error: error.message
-//         });
-//     }
-// }
-
-async updateCustomer(req, res) {
-      const updateData = req.body;
-      const customerId = req.params.id;
-  
-      try {
-          // Fetch the user with the ID
-          const existingCustomer = await CustomerService.fetchOne({ _id: customerId });
-          if (!existingCustomer) {
-              return res.status(404).json({
-                  success: false,
-                  message: 'Customer not found'
-              });
-          }
-  
-          // Check if name already exists
-          if (updateData.name) {
-              const existingCustomerWithUpdateName = await CustomerService.fetchOne({
-                  name: new RegExp(`^${updateData.name}$`, "i") // Case-insensitive
-              });
-  
-              if (
-                  existingCustomerWithUpdateName &&
-                  existingCustomerWithUpdateName._id.toString() !== customerId
-              ) {
-                  return res.status(403).json({
-                      success: false,
-                      message: 'Customer with that name already exists'
-                  });
-              }
-          }
-  
-          // Update the customer
-          const updatedData = await CustomerService.update(customerId, updateData);
-          return res.status(200).json({
-              success: true,
-              message: 'Customer updated successfully',
-              data: updatedData
-          });
-      } catch (error) {
-          console.error(error);
-          return res.status(500).json({
-              success: false,
-              message: 'Internal server error',
-              error: error.message
-          });
-      }
-  }
-
-
-    async fetchCustomers(req, res){
-        // console.log('I am now done with authentication')
-        const allCustomers = await  CustomerService.fetch({});
-        return res.status(200).json({
-            success: true,
-            message: 'Customer Fetched Successfully',
-            data: allCustomers
-        })
-    }
-
-    async fetchOneCustomer(req, res){
-        const customerId = req.params.id;
-        const customerToFetch = await CustomerService.fetchOne({_id: customerId});
-
-        // if(!customerToFetch) res.status(403).json({
-        //   success: false,
-        //   message: 'customer not found'
-        // })
-        if(!customerToFetch) {
-          return res.status(404).json({
-            success: false,
-            message: 'customer not found'
-          })
-        }
-
-        return res.status(200).json({
-            success: true,
-            message: 'customer Fetched Successfully',
-            data: customerToFetch
-        })
-
-    }   
-
-    async deleteCustomer(req, res){
-        const customerId = req.params.id
-        const customerToFetch = await  CustomerService.fetchOne({_id: customerId});
-
-        if(!customerToFetch) return res.status(404).json({
-            success: false,
-            message: 'Customer not found'
-        })
-
-        const deletedCustomer = await CustomerService.delete(customerId);
-
-        return res.status(200).json({
-            success: true,
-            message: 'Customer Deleted Successfully',
-            // data: deletedCustomer
-        })
-
-    }
-
-    async getCustomerTransactions(req, res, next) {
-      try {
-        const customerId = req.params.customerId;
-        const transactions = await customerService.getCustomerTransactions(customerId);
-        res.status(200).json(transactions);
-      } catch (error) {
-        next(error);
-      }
-    }
-    //Search Engine
-    async searchCustomerByName(req, res) {
-      try {
-        const { name } = req.query;
-    
-        // Check if a name parameter is provided
-        if (!name) {
+        if (existingBVN) {
           return res.status(400).json({
             success: false,
-            message: 'Please provide a name for the search.',
+            message: "BVN already exists",
           });
         }
-    
-        // Use the CustomerService to search customers by name (using the correct field)
-        const customers = await CustomerService.fetch({ name: { $regex: name, $options: 'i' } });
-    
-        return res.status(200).json({
-          success: true,
-          message: 'Customers found successfully',
-          data: customers,
+      }
+
+      // Check duplicate phone
+      if (customer.customersPhoneNo) {
+        const existingPhone = await CustomerModel.findOne({
+          customersPhoneNo: customer.customersPhoneNo,
         });
-      } catch (error) {
-        return res.status(500).json({
+
+        if (existingPhone) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone number already exists",
+          });
+        }
+      }
+
+      // Save image if supplied
+      if (picturePath && fs.existsSync(picturePath)) {
+        customer.picture = picturePath;
+      }
+
+      console.log("Customer to save:", customer);
+
+      const createdCustomer = await customerService.create(customer);
+
+      return res.status(201).json({
+        success: true,
+        message: "Customer Created Successfully",
+        data: createdCustomer,
+        accountNumber,
+      });
+    } catch (error) {
+      console.error("CREATE CUSTOMER ERROR:", error);
+
+      // Mongo duplicate key fallback
+      if (error.code === 11000) {
+        const field = Object.keys(error.keyPattern)[0];
+
+        return res.status(400).json({
           success: false,
-          message: 'Error searching for customers by name',
-          error: error.message,
+          message: `${field} already exists`,
         });
       }
-    }
 
-    async getSavingsTransactions(customerId) {
-      try {
-        // Filter transactions based on customer ID and type "savings"
-        const savingsTransactions = await TransactionModel.find({
-          customer: customerId,
-          type: "savings",
-        });
-  
-        return savingsTransactions;
-      } catch (error) {
-        throw error;
+      return res.status(500).json({
+        success: false,
+        message: "Error creating customer",
+        error: error.message,
+      });
+    }
+  }
+
+  // UPDATE CUSTOMER
+  async updateCustomer(req, res) {
+    try {
+      const customerId = req.params.id;
+      const updateData = { ...req.body };
+
+      // Format phone automatically
+      if (updateData.customersPhoneNo) {
+        updateData.customersPhoneNo = formatPhone(updateData.customersPhoneNo);
       }
-    }
-   
-    // Currently Doesn't work
-    async searchCustomers(req, res) {
-      try {
-        const { name, accountNumber, phoneNumber, dateOfBirth } = req.query;
 
-        // Construct a query object based on the provided parameters
-        const query = {};
+      const existingCustomer = await CustomerService.fetchOne({
+        _id: customerId,
+      });
 
-        if (name) {
-          query.firstName = new RegExp(name, 'i'); // Case-insensitive search
-        }
-
-        if (accountNumber) {
-          query.lastName = new RegExp(accountNumber, 'i');
-        }
-
-        if (dateOfBirth) {
-          query.email = new RegExp(dateOfBirth, 'i');
-        }
-
-        if (phoneNumber) {
-          query.phoneNumber = new RegExp(phoneNumber, 'i');
-        }
-
-        // Call your CustomerService to search for customers using the query
-        const customers = await CustomerService.searchCustomers(query);
-
-        return res.status(200).json({
-          success: true,
-          message: 'Customers found successfully',
-          data: customers
-        });
-      } catch (error) {
-        return res.status(500).json({
+      if (!existingCustomer) {
+        return res.status(404).json({
           success: false,
-          message: 'Error retrieving customers',
-          error: error.message,
+          message: "Customer not found",
         });
       }
-    } 
 
-    // async getSavingsTransactions(req, res, next) {
-    //   try {
-    //     const customerId = req.params.customerId;
-    //     const savingsTransactions = await CustomerService.getSavingsTransactions(customerId);
-    //     res.status(200).json(savingsTransactions);
-    //   } catch (error) {
-    //     next(error);
-    //   }
-    // }
-  
+      // Prevent duplicate names
+      if (updateData.name) {
+        const duplicateName = await CustomerService.fetchOne({
+          name: new RegExp(`^${updateData.name}$`, "i"),
+        });
+
+        if (duplicateName && duplicateName._id.toString() !== customerId) {
+          return res.status(400).json({
+            success: false,
+            message: "Customer with that name already exists",
+          });
+        }
+      }
+
+      // Prevent duplicate BVN
+      if (updateData.bvn) {
+        const duplicateBVN = await CustomerModel.findOne({
+          bvn: updateData.bvn,
+          _id: { $ne: customerId },
+        });
+
+        if (duplicateBVN) {
+          return res.status(400).json({
+            success: false,
+            message: "BVN already exists",
+          });
+        }
+      }
+
+      // Prevent duplicate phone
+      if (updateData.customersPhoneNo) {
+        const duplicatePhone = await CustomerModel.findOne({
+          customersPhoneNo: updateData.customersPhoneNo,
+          _id: { $ne: customerId },
+        });
+
+        if (duplicatePhone) {
+          return res.status(400).json({
+            success: false,
+            message: "Phone number already exists",
+          });
+        }
+      }
+
+      const updatedCustomer = await CustomerService.update(
+        customerId,
+        updateData,
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Customer updated successfully",
+        data: updatedCustomer,
+      });
+    } catch (error) {
+      console.error("UPDATE CUSTOMER ERROR:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Error updating customer",
+        error: error.message,
+      });
+    }
+  }
+
+  // GET ALL CUSTOMERS
+  async fetchCustomers(req, res) {
+    try {
+      const customers = await CustomerService.fetch({});
+
+      return res.status(200).json({
+        success: true,
+        message: "Customer Fetched Successfully",
+        data: customers,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // GET ONE CUSTOMER
+  async fetchOneCustomer(req, res) {
+    try {
+      const customerId = req.params.id;
+
+      const customer = await CustomerService.fetchOne({
+        _id: customerId,
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        message: "Customer Fetched Successfully",
+        data: customer,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // DELETE CUSTOMER
+  async deleteCustomer(req, res) {
+    try {
+      const customerId = req.params.id;
+
+      const customer = await CustomerService.fetchOne({
+        _id: customerId,
+      });
+
+      if (!customer) {
+        return res.status(404).json({
+          success: false,
+          message: "Customer not found",
+        });
+      }
+
+      await CustomerService.delete(customerId);
+
+      return res.status(200).json({
+        success: true,
+        message: "Customer Deleted Successfully",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // CUSTOMER TRANSACTIONS
+  async getCustomerTransactions(req, res, next) {
+    try {
+      const customerId = req.params.customerId;
+
+      const transactions =
+        await customerService.getCustomerTransactions(customerId);
+
+      return res.status(200).json(transactions);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  // SEARCH BY NAME
+  async searchCustomerByName(req, res) {
+    try {
+      const { name } = req.query;
+
+      if (!name) {
+        return res.status(400).json({
+          success: false,
+          message: "Please provide a name",
+        });
+      }
+
+      const customers = await CustomerService.fetch({
+        name: {
+          $regex: name,
+          $options: "i",
+        },
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Customers found successfully",
+        data: customers,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
+
+  // SAVINGS TRANSACTIONS
+  async getSavingsTransactions(customerId) {
+    try {
+      return await TransactionModel.find({
+        customer: customerId,
+        type: "savings",
+      });
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  // SEARCH CUSTOMERS
+  async searchCustomers(req, res) {
+    try {
+      const { name, accountNumber, phoneNumber, dateOfBirth } = req.query;
+
+      const query = {};
+
+      if (name) query.name = new RegExp(name, "i");
+
+      if (accountNumber) query.accountNumber = new RegExp(accountNumber, "i");
+
+      if (phoneNumber) query.customersPhoneNo = new RegExp(phoneNumber, "i");
+
+      if (dateOfBirth) query.dateOfBirth = new RegExp(dateOfBirth, "i");
+
+      const customers = await CustomerService.searchCustomers(query);
+
+      return res.status(200).json({
+        success: true,
+        message: "Customers found successfully",
+        data: customers,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: error.message,
+      });
+    }
+  }
 }
 
 module.exports = new CustomerController()

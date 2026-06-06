@@ -1,15 +1,25 @@
 const bcrypt = require("bcryptjs");
 const express = require("express");
 const userService = require("../services/user.service"); // Use your service
-const { authenticate, adminAuthorizer, admin_managerAuthorizer } = require('../middlewares/authentication');
+const {
+  authenticate,
+  adminAuthorizer,
+  admin_managerAuthorizer,
+} = require("../middlewares/authentication");
 const validate = require("../middlewares/validate.middleware");
 const registerSchema = require("../schema/user.schema");
-const { registerUser, getByID, deleteUser, getAllUsers, loginUser } = require("../controller/user.controller");
+const {
+  registerUser,
+  getByID,
+  deleteUser,
+  getAllUsers,
+  loginUser,
+} = require("../controller/user.controller");
 const loginSchema = require("../schema/login.schema");
 
 const router = express.Router();
 
-router.post("/register", authenticate, adminAuthorizer, validate(registerSchema), registerUser);
+router.post("/register", validate(registerSchema), registerUser);
 router.post("/login", validate(loginSchema), loginUser);
 router.get("/", authenticate, getAllUsers);
 router.get("/:id", authenticate, getByID);
@@ -66,7 +76,7 @@ router.post("/change-password", authenticate, async (req, res) => {
 
     // Update password using userService
     const updatedUser = await userService.update(req.user._id, {
-      password: newPassword // Let the model pre-save hook handle hashing
+      password: newPassword, // Let the model pre-save hook handle hashing
     });
 
     res.status(200).json({

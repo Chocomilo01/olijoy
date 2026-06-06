@@ -84,6 +84,30 @@ router.get(
   "/withdrawalsByPaymentDate",
   transactionController.getAllWithdrawalsByPaymentDate,
 );
+
+const { sendSMS } = require("../services/smsService");
+
+router.get("/test-sms", async (req, res) => {
+  try {
+    const result = await sendSMS(
+      "09034234534", // replace with your phone number
+      "Test SMS from OLJ UNIQUE",
+    );
+
+    res.status(200).json({
+      success: true,
+      message: "SMS request sent",
+      result,
+    });
+  } catch (error) {
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
 // To get the total transactions by date
 //router.get("/search-by-date", transactionController.searchTransactionsByDate);
 //router.get('/search-deposit-cash-by-date', transactionController.searchDepositCashByDate);
