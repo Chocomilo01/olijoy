@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-
 const TransactionSchema = new mongoose.Schema(
   {
     type: {
@@ -20,13 +19,14 @@ const TransactionSchema = new mongoose.Schema(
     name: {
       type: String,
     },
-    
+
     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "UserModel", // Reference to the User model
     },
     choose: {
-      type: String, emum: ["debit", "credit"],
+      type: String,
+      emum: ["debit", "credit"],
     },
     collectedBy: {
       type: String,
@@ -45,15 +45,19 @@ const TransactionSchema = new mongoose.Schema(
       type: Date,
     },
     modeOfPayment: {
-      type: String, emum: ["cash", "transfer"],
+      type: String,
+      emum: ["cash", "transfer"],
     },
     balance: {
-      type: Number
+      type: Number,
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-TransactionSchema.index({ type: 1, amount: 1, customer: 1, paymentDate: 1 }, { unique: true });
+TransactionSchema.index(
+  { type: 1, amount: 1, customer: 1, paymentDate: 1 },
+  { unique: true },
+);
 
 module.exports = mongoose.model("TransactionModel", TransactionSchema);

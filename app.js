@@ -1,13 +1,12 @@
 // Import necessary modules
-const express = require('express');
-const mongoose = require('mongoose');
-const rootRoute = require('./routes/indexRoute');
-const cors = require('cors');
-const loggingMiddleware = require('./middlewares/loggingMiddleware'); // Import the logging middleware
-const errorHandler = require('./middlewares/test.middleware');
+const express = require("express");
+const mongoose = require("mongoose");
+const rootRoute = require("./routes/indexRoute");
+const cors = require("cors");
+const loggingMiddleware = require("./middlewares/loggingMiddleware"); // Import the logging middleware
+const errorHandler = require("./middlewares/test.middleware");
 
-
-require('dotenv').config();
+require("dotenv").config();
 const app = express();
 
 // Add middleware for request logging
@@ -18,9 +17,11 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["http://localhost:3000",
+    origin: [
+      "http://localhost:3000",
       "https://olijoyuniquebc.com",
-      "https://www.olijoyuniquebc.com",],
+      "https://www.olijoyuniquebc.com",
+    ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
     allowedHeaders: [
@@ -32,21 +33,22 @@ app.use(
     ],
   }),
 );
-app.use(errorHandler)
+app.use(errorHandler);
 
-app.use('/api/v1', rootRoute);
+app.use("/api/v1", rootRoute);
 
- mongoose.connect(process.env.MONGODB_URI, {
-  useNewUrlParser: true, 
-  useUnifiedTopology: true,
-  family: 4,
-})
-    .then(() => {
-      console.log('Connected to the database');
-    })
-    .catch((error) => {
-      console.log('Error connecting to the database:', error);
-    });
+mongoose
+  .connect(process.env.MONGODB_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    family: 4,
+  })
+  .then(() => {
+    console.log("Connected to the database");
+  })
+  .catch((error) => {
+    console.log("Error connecting to the database:", error);
+  });
 
 const port = process.env.PORT || 5200;
 app.listen(port, () => {

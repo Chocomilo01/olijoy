@@ -6,7 +6,7 @@ const genAuthToken = function (obj) {
 	// 1 hour
 	const jwtToken = jwt.sign(obj,
 					process.env.JWT_SECRET_KEY,
-					{ expiresIn: '1d' }
+					{ expiresIn: '2hr' }
 				);
 	return jwtToken;
 }

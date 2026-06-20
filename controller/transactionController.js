@@ -1,11 +1,17 @@
+const mongoose = require("mongoose");
 const TransactionService = require("../services/transactionService");
 const CustomerService = require("../services/customerService");
+// const { sendSMS } = require("../services/smsService");
 const { sendSMS } = require("../services/smsService");
 
 class TransactionController {
   // Inside the createDeposit method
   async createDeposit(req, res) {
+    const session = await mongoose.startSession();
+
     try {
+      session.startTransaction();
+
       const {
         customerId,
         amount,
@@ -17,98 +23,91 @@ class TransactionController {
         name,
       } = req.body;
 
-      // Verify that the customer exists
-      const customer = await CustomerService.fetchOne({ _id: customerId });
+      const customer = await CustomerService.fetchOne(
+        { _id: customerId },
+        null,
+        { session },
+      );
 
       if (!customer) {
+        await session.abortTransaction();
         return res.status(404).json({
           success: false,
           message: "Customer not found",
         });
       }
 
-      // Fetch user information (user ID and user name) from your authentication system or user service
-
-      // The information here would be better gotten from the jwt token
       const userId = req.body.id;
       const firstName = req.body.firstName;
       const middleName = req.body.middleName;
 
-      // Convert the amount to a number
-      const depositAmount = parseFloat(amount);
+      const depositAmount = Number(amount);
 
       customer.accountBalance += depositAmount;
-      await customer.save();
+
+      await customer.save({ session });
 
       const updatedBalance = customer.accountBalance;
 
-      try {
-        await sendSMS(
-          customer.customersPhoneNo,
-          `OLJ UNIQUE
-
-Dear ${customer.name},
-
-Your account ${customer.accountNumber} has been credited with NGN ${depositAmount}.
-
-Available Balance: NGN ${updatedBalance}.
-
-Thank you.`,
-        );
-      } catch (err) {
-        console.log("Deposit SMS failed:", err.message);
-      }
-
-      // Create a deposit transaction
-      const depositTransaction = await TransactionService.create({
-        type: "deposit",
-        amount: depositAmount, // Use the parsed amount here
-        customer: customer._id,
-        description,
-        choose: "credit",
-        collectedBy,
-        uploadedBy,
-        modeOfPayment,
-        paymentDate,
-        userId: userId,
-        balance: updatedBalance,
-        name,
-      });
-
-      const responsePayload = {
-        transaction: depositTransaction,
-        balance: updatedBalance,
-        user: {
-          id: userId,
-          firstName: firstName,
-          middleName: middleName,
+      const depositTransaction = await TransactionService.create(
+        {
+          type: "deposit",
+          amount: depositAmount,
+          customer: customer._id,
+          description,
+          choose: "credit",
+          collectedBy,
+          uploadedBy,
+          modeOfPayment,
+          paymentDate,
+          userId,
+          balance: updatedBalance,
+          name,
         },
-      };
+        { session },
+      );
+
+      await session.commitTransaction();
+      
+const shortName = customer.name
+  ?.split(" ")
+  .slice(0, 4)
+  .join(" ");
+      const message = `Acct: ${customer.accountNumber.replace("OLJ-", "")}. 
+      NGN${Number(depositAmount).toLocaleString("en-NG")}.
+      DESC:${shortName} to Olijoy
+      Avail Bal: NGN${Number(updatedBalance).toLocaleString("en-NG")}.
+      Thank you for banking with OLIJOY.`;
+
+      try {
+        await sendSMS(customer.customersPhoneNo, message);
+      } catch (err) {
+        console.error("ALL SMS PROVIDERS FAILED:", err.message);
+      }
 
       return res.status(201).json({
         success: true,
         message: "Deposit created successfully",
-        data: responsePayload,
+        data: {
+          transaction: depositTransaction,
+          balance: updatedBalance,
+          user: {
+            id: userId,
+            firstName,
+            middleName,
+          },
+        },
       });
     } catch (error) {
-      if (error.code === 11000 && error.keyPattern) {
-        // Check if the error is a duplicate key error
-        const keys = Object.keys(error.keyPattern);
-        const duplicateFields = keys.map(
-          (key) => key.charAt(0).toUpperCase() + key.slice(1),
-        );
-        const errorMessage = `Duplicate ${duplicateFields.join(", ")} found. Please ensure uniqueness.`;
-        return res.status(400).json({
-          success: false,
-          message: errorMessage,
-        });
-      } else {
-        return res.status(500).json({
-          success: false,
-          message: "Error creating deposit",
-          error: error.message,
-        });
-      }
+      await session.abortTransaction();
+
+      return res.status(500).json({
+        success: false,
+        message: "Error creating deposit",
+        error: error.message,
+      });
+    } finally {
+      session.endSession();
     }
   }
   //     return res.status(500).json({
@@ -120,7 +119,11 @@ Thank you.`,
   // }
 
   async createWithdrawal(req, res) {
+    const session = await mongoose.startSession();
+
     try {
+      session.startTransaction();
+
       const {
         customerId,
         amount,
@@ -132,103 +135,104 @@ Thank you.`,
         name,
       } = req.body;
 
-      // Verify that the customer exists
-      const customer = await CustomerService.fetchOne({ _id: customerId });
+      const customer = await CustomerService.fetchOne(
+        { _id: customerId },
+        null,
+        { session },
+      );
 
       if (!customer) {
+        await session.abortTransaction();
         return res.status(404).json({
           success: false,
           message: "Customer not found",
         });
       }
 
-      // Check if the customer has sufficient balance for the withdrawal
-      if (customer.accountBalance < amount) {
+      const withdrawalAmount = Number(amount);
+
+      if (customer.accountBalance < withdrawalAmount) {
+        await session.abortTransaction();
+
         return res.status(400).json({
           success: false,
           message: "Insufficient funds for withdrawal",
         });
       }
 
-      // Fetch user information (user ID and user name) from your authentication system or user service
-      // Get user identity from jwt
       const userId = req.body.id;
-      const firstName = req.body.firstNameame;
-      const middleName = req.body.middleNameame; // Replace with how you retrieve the user name
+      const firstName = req.body.firstName;
+      const middleName = req.body.middleName;
 
-      // Update the customer's account balance
-      customer.accountBalance -= amount;
-      await customer.save();
+      customer.accountBalance -= withdrawalAmount;
+
+      await customer.save({ session });
 
       const updatedBalance = customer.accountBalance;
 
-      try {
-        await sendSMS(
-          customer.customersPhoneNo,
-          `OLJ UNIQUE
-
-Dear ${customer.name},
-
-Your account ${customer.accountNumber} has been debited with NGN ${amount}.
-
-Available Balance: NGN ${updatedBalance}.
-
-Thank you.`,
-        );
-      } catch (error) {
-        console.error("========== TERMII ERROR ==========");
-        console.error(error.response?.data || error.message);
-        console.error("==================================");
-
-        throw error;
-      }
-
-      // Create a withdrawal transaction with user information
-      const withdrawalTransaction = await TransactionService.createWithdrawal({
-        type: "withdrawal",
-        amount,
-        customer: customer._id,
-        userId, // Include the user ID
-        firstName, // Include the user name
-        middleName,
-        description,
-        choose: "Debit",
-        modeOfPayment: modeOfPayment,
-        paymentDate,
-        collectedBy,
-        uploadedBy,
-        balance: updatedBalance,
-        name,
-        //AccountOfficer: userId,
-      });
-
-      // Include user information in the response
-      const responsePayload = {
-        transaction: withdrawalTransaction,
-        balance: updatedBalance,
-        // This aspect won't work cause the info wasn't passed in well
-        user: {
-          id: userId,
-          firstName: firstName,
-          middleName: middleName,
-          // Include the updated balance
+      const withdrawalTransaction = await TransactionService.createWithdrawal(
+        {
+          type: "withdrawal",
+          amount: withdrawalAmount,
+          customer: customer._id,
+          userId,
+          firstName,
+          middleName,
+          description,
+          choose: "Debit",
+          modeOfPayment,
+          paymentDate,
+          collectedBy,
+          uploadedBy,
+          balance: updatedBalance,
+          name,
         },
-      };
+        { session },
+      );
+
+      await session.commitTransaction();
+      const shortName = customer.name
+  ?.split(" ")
+  .slice(0, 4)
+  .join(" ");
+
+      const message = `acct: ${customer.accountNumber.replace("OLJ-", "")}
+      NGN${Number(amount).toLocaleString("en-NG")}.DR
+      DESC:Olijoy to ${shortName}
+      Avail Bal: NGN${Number(updatedBalance).toLocaleString("en-NG")}.
+      Thank you for banking with OLIJOY.`;
+
+      try {
+        await sendSMS(customer.customersPhoneNo, message);
+      } catch (err) {
+        console.error("ALL SMS PROVIDERS FAILED:", err.message);
+      }
 
       return res.status(201).json({
         success: true,
         message: "Withdrawal created successfully",
-        data: responsePayload,
+        data: {
+          transaction: withdrawalTransaction,
+          balance: updatedBalance,
+          user: {
+            id: userId,
+            firstName,
+            middleName,
+          },
+        },
       });
     } catch (error) {
+      await session.abortTransaction();
+
       return res.status(500).json({
         success: false,
         message: "Error creating withdrawal",
         error: error.message,
       });
+    } finally {
+      session.endSession();
     }
   }
-
   // async updateTransaction(req, res) {
   //   try {
   //     const { id } = req.params; // Transaction ID
