@@ -19,7 +19,13 @@ const loginSchema = require("../schema/login.schema");
 
 const router = express.Router();
 
-router.post("/register", validate(registerSchema), registerUser);
+router.post(
+  "/register",
+  authenticate,
+  adminAuthorizer,
+  validate(registerSchema),
+  registerUser,
+);
 router.post("/login", validate(loginSchema), loginUser);
 router.get("/", authenticate, getAllUsers);
 router.get("/:id", authenticate, getByID);
