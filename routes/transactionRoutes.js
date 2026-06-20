@@ -41,7 +41,7 @@ router.get(
 router.post(
   "/withdrawal",
   authenticate,
-  adminAuthorizer,
+  
   admin_managerAuthorizer,
 
   validate(paymentSchema),
