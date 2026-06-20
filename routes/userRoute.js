@@ -22,7 +22,9 @@ const router = express.Router();
 router.post(
   "/register",
   authenticate,
+  admin_managerAuthorizer,
   adminAuthorizer,
+
   validate(registerSchema),
   registerUser,
 );

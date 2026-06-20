@@ -12,11 +12,15 @@ const formatPhone = require("../utils/phoneFormatter");
 
 
 class CustomerController {
+
   // CREATE CUSTOMER
   async createCustomer(req, res) {
     try {
       const customer = { ...req.body };
       const picturePath = req.body.picturePath;
+
+          customer.officerIncharge =
+      `${req.user.firstName} ${req.user.lastName}`.trim();
 
       // Generate unique account number
       let accountNumber;
