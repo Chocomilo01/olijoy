@@ -68,13 +68,10 @@ class TransactionController {
       );
 
       await session.commitTransaction();
-      
-const shortName = customer.name
-  ?.split(" ")
-  .slice(0, 4)
-  .join(" ");
+
+      const shortName = customer.name?.split(" ").slice(0, 4).join(" ");
       const message = `Acct: ${customer.accountNumber.replace("OLJ-", "")}. 
-      NGN${Number(depositAmount).toLocaleString("en-NG")}.
+      NGN${Number(depositAmount).toLocaleString("en-NG")}.CR
       DESC:${shortName} to Olijoy
       Avail Bal: NGN${Number(updatedBalance).toLocaleString("en-NG")}.
       Thank you for banking with OLIJOY.`;
@@ -191,10 +188,7 @@ const shortName = customer.name
       );
 
       await session.commitTransaction();
-      const shortName = customer.name
-  ?.split(" ")
-  .slice(0, 4)
-  .join(" ");
+      const shortName = customer.name?.split(" ").slice(0, 4).join(" ");
 
       const message = `acct: ${customer.accountNumber.replace("OLJ-", "")}
       NGN${Number(amount).toLocaleString("en-NG")}.DR
