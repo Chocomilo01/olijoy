@@ -7,6 +7,7 @@ const { sendSMS } = require("../services/smsService");
 class TransactionController {
   // Inside the createDeposit method
   async createDeposit(req, res) {
+    
     const session = await mongoose.startSession();
 
     try {
@@ -67,19 +68,36 @@ class TransactionController {
         { session },
       );
 
+      // Commit transaction first
       await session.commitTransaction();
 
+      // Build SMS message
       const shortName = customer.name?.split(" ").slice(0, 4).join(" ");
-      const message = `Acct: ${customer.accountNumber.replace("OLJ-", "")}. 
-      NGN${Number(depositAmount).toLocaleString("en-NG")}.CR
-      DESC:${shortName} to Olijoy
-      Avail Bal: NGN${Number(updatedBalance).toLocaleString("en-NG")}.
-      Thank you for banking with OLIJOY.`;
 
+      const message = `Acct: ${customer.accountNumber.replace("OLJ-", "")}.
+NGN${Number(depositAmount).toLocaleString("en-NG")}.CR
+DESC:${shortName} to Olijoy
+Avail Bal: NGN${Number(updatedBalance).toLocaleString("en-NG")}.
+Thank you for banking with OLIJOY.`;
+
+      // Debug logs
+      console.log("===== DEPOSIT REQUEST =====");
+      console.log(req.body);
+
+      console.log("=== SMS DEBUG ===");
+      console.log("Customer ID:", customer._id);
+      console.log("Phone:", customer.customersPhoneNo);
+      console.log("Amount:", depositAmount);
+      console.log("Balance:", updatedBalance);
+      console.log("Message:", message);
+
+      // Send SMS
       try {
-        await sendSMS(customer.customersPhoneNo, message);
+        const smsResult = await sendSMS(customer.customersPhoneNo, message);
+
+        console.log("SMS SUCCESS:", smsResult);
       } catch (err) {
-        console.error("ALL SMS PROVIDERS FAILED:", err.message);
+        console.error("SMS FAILED:", err);
       }
 
       return res.status(201).json({
