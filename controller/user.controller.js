@@ -3,38 +3,139 @@ const { genAuthToken } = require("../utils/genAuthToken");
 
 exports.registerUser = async (req, res) => {
     // This Endpoint Registers A User.
-    try {
-        // Check if the user already exists
-        let userEmail = await userService.findOne({ email: req.body.email });
-        let userBVN = await userService.findOne({ bvn: req.body.bvn });
+    
+  try {
+    const {
+      email,
+      bvn,
+      phone,
+      firstName,
+      lastName,
+      password,
+    } = req.body;
 
-        if (userEmail || userBVN) {
-            return res.status(400).json({
-                success: false,
-                message: "user credentials already exists.",
-            });
-        }
+    // Required fields validation
+    if (!firstName)
+      return res.status(400).json({
+        success: false,
+        message: "First Name is required",
+      });
 
-        // Create a new user
-        const userSaved = await userService.createUser({...req.body})
+    if (!lastName)
+      return res.status(400).json({
+        success: false,
+        message: "Last Name is required",
+      });
 
-        // Generate JWT token
-        const token = genAuthToken({_id: userSaved._id, roles: userSaved.roles});
+    if (!phone)
+      return res.status(400).json({
+        success: false,
+        message: "Phone Number is required",
+      });
 
-        // Respond with success
-        res.status(200).json({
-            success: true,
-            message: "Registered successfully",
-            data: { userSaved, token },
-        });
-    } catch (error) {
-        console.error("Error during user registration:", error);
-        res.status(500).json({
-            success: false,
-            message: `Internal server error: ${error.message}`,
-        });
+    if (!email)
+      return res.status(400).json({
+        success: false,
+        message: "Email is required",
+      });
+
+    if (!password)
+      return res.status(400).json({
+        success: false,
+        message: "Password is required",
+      });
+
+    if (password.length < 6)
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters",
+      });
+
+    // Duplicate checks
+    const existingEmail = await userService.findOne({ email });
+
+    if (existingEmail) {
+      return res.status(400).json({
+        success: false,
+        message: "Email already exists",
+      });
     }
+
+    const existingBVN = await userService.findOne({ bvn });
+
+    if (existingBVN) {
+      return res.status(400).json({
+        success: false,
+        message: "BVN already exists",
+      });
+    }
+
+    const existingPhone = await userService.findOne({ phone });
+
+    if (existingPhone) {
+      return res.status(400).json({
+        success: false,
+        message: "Phone number already exists",
+      });
+    }
+
+    const userSaved = await userService.createUser({
+      ...req.body,
+    });
+
+    const token = genAuthToken({
+      _id: userSaved._id,
+      roles: userSaved.roles,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+      data: {
+        userSaved,
+        token,
+      },
+    });
+  } catch (error) {
+    console.error("Registration Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Internal server error",
+    });
+  }
 };
+        // Check if the user already exists
+//         let userEmail = await userService.findOne({ email: req.body.email });
+//         let userBVN = await userService.findOne({ bvn: req.body.bvn });
+
+//         if (userEmail || userBVN) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "user credentials already exists.",
+//             });
+//         }
+
+//         // Create a new user
+//         const userSaved = await userService.createUser({...req.body})
+
+//         // Generate JWT token
+//         const token = genAuthToken({_id: userSaved._id, roles: userSaved.roles});
+
+//         // Respond with success
+//         res.status(200).json({
+//             success: true,
+//             message: "Registered successfully",
+//             data: { userSaved, token },
+//         });
+//     } catch (error) {
+//         console.error("Error during user registration:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: `Internal server error: ${error.message}`,
+//         });
+//     }
+// };
 
 exports.loginUser = async (req, res) => {
     // This Endpoint Login A User.
