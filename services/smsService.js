@@ -1,9 +1,12 @@
 const axios = require("axios");
 
-const sendSMS = async (phone, message) => {
+
   // ==========================
   // TRY TERMII FIRST
   // ==========================
+  const sendSMS = async (phone, message) => {
+  console.log("SMS FUNCTION CALLED");
+  console.log("PHONE:", phone);
   try {
     console.log("Trying Termii...");
 

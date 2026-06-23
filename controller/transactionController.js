@@ -7,7 +7,10 @@ const { sendSMS } = require("../services/smsService");
 class TransactionController {
   // Inside the createDeposit method
   async createDeposit(req, res) {
-    
+    console.log("================================");
+    console.log("CREATE DEPOSIT CALLED");
+    console.log("BODY:", req.body);
+    console.log("================================");
     const session = await mongoose.startSession();
 
     try {
@@ -92,7 +95,9 @@ Thank you for banking with OLIJOY.`;
       console.log("Message:", message);
 
       // Send SMS
+      
       try {
+        console.log("CALLING SMS SERVICE...");
         const smsResult = await sendSMS(customer.customersPhoneNo, message);
 
         console.log("SMS SUCCESS:", smsResult);
