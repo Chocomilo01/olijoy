@@ -2,6 +2,24 @@ const TransactionModel = require("../model/transactionModel");
 
 // Implement other CRUD operations as needed
 class TransactionService {
+  // async create(transactionData) {
+  //   return await TransactionModel.create(transactionData);
+  // }
+
+  // async fetch(filter) {
+  //   return await TransactionModel.find(filter);
+  // }
+  // async getAllDeposits() {
+  //   try {
+  //     // Query all transactions with type "deposit"
+  //     const deposits = await TransactionModel.find({ type: "deposit" });
+
+  //     return deposits;
+  //   } catch (error) {
+  //     throw new Error(`Error fetching deposit transactions: ${error.message}`);
+  //   }
+  // }
+
   async create(transactionData) {
     return await TransactionModel.create(transactionData);
   }
@@ -9,11 +27,14 @@ class TransactionService {
   async fetch(filter) {
     return await TransactionModel.find(filter);
   }
+
+  async fetchOne(filter) {
+    return await TransactionModel.findOne(filter);
+  }
+
   async getAllDeposits() {
     try {
-      // Query all transactions with type "deposit"
       const deposits = await TransactionModel.find({ type: "deposit" });
-
       return deposits;
     } catch (error) {
       throw new Error(`Error fetching deposit transactions: ${error.message}`);
@@ -132,94 +153,94 @@ class TransactionService {
       return transactions;
     } catch (error) {
       throw new Error(
-        `Error retrieving paginated transactions: ${error.message}`
+        `Error retrieving paginated transactions: ${error.message}`,
       );
     }
   }
-async getAllTransactionsByUploaderPaginated(uploadedBy, skip, limit) {
-  try {
-    const transactions = await TransactionModel.find({
-      uploadedBy: { 
-        $regex: uploadedBy, 
-        $options: "i" // case insensitive
-      }
-    })
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
+  async getAllTransactionsByUploaderPaginated(uploadedBy, skip, limit) {
+    try {
+      const transactions = await TransactionModel.find({
+        uploadedBy: {
+          $regex: uploadedBy,
+          $options: "i", // case insensitive
+        },
+      })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
 
-    return transactions;
-  } catch (error) {
-    throw new Error(
-      `Error retrieving paginated transactions by uploader: ${error.message}`
-    );
-  }
-}
- async countAllTransactionsByUploader(uploadedBy) {
-  try {
-    return await TransactionModel.countDocuments({
-      uploadedBy: { 
-        $regex: uploadedBy, 
-        $options: "i" 
-      }
-    });
-  } catch (error) {
-    throw new Error(
-      `Error counting transactions by uploader: ${error.message}`
-    );
-  }
-}
-async getAllWithdrawalsPaginated(filter = {}, skip, limit) {
-  try {
-    const withdrawals = await TransactionModel.find(filter)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .populate('customer', 'firstName lastName accountNumber')
-      .populate('userId', 'firstName middleName lastName')
-      .lean();
-
-    return withdrawals;
-  } catch (error) {
-    throw new Error(`Error fetching paginated withdrawals: ${error.message}`);
-  }
-}
-
-async countAllWithdrawals(filter = {}) {
-  try {
-    // Ensure we only count withdrawals
-    const finalFilter = { ...filter, type: "withdrawal" };
-    return await TransactionModel.countDocuments(finalFilter);
-  } catch (error) {
-    throw new Error(`Error counting withdrawals: ${error.message}`);
-  }
-}
- async getTransactions(query, skip, limit) {
-  try {
-    // Handle uploadedBy and collectedBy with partial matching
-    if (query.uploadedBy) {
-      query.uploadedBy = { 
-        $regex: query.uploadedBy, 
-        $options: "i" 
-      };
+      return transactions;
+    } catch (error) {
+      throw new Error(
+        `Error retrieving paginated transactions by uploader: ${error.message}`,
+      );
     }
-    if (query.collectedBy) {
-      query.collectedBy = { 
-        $regex: query.collectedBy, 
-        $options: "i" 
-      };
-    }
-
-    return await TransactionModel.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-  } catch (error) {
-    throw new Error("Error fetching transactions: " + error.message);
   }
-}
+  async countAllTransactionsByUploader(uploadedBy) {
+    try {
+      return await TransactionModel.countDocuments({
+        uploadedBy: {
+          $regex: uploadedBy,
+          $options: "i",
+        },
+      });
+    } catch (error) {
+      throw new Error(
+        `Error counting transactions by uploader: ${error.message}`,
+      );
+    }
+  }
+  async getAllWithdrawalsPaginated(filter = {}, skip, limit) {
+    try {
+      const withdrawals = await TransactionModel.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate("customer", "firstName lastName accountNumber")
+        .populate("userId", "firstName middleName lastName")
+        .lean();
+
+      return withdrawals;
+    } catch (error) {
+      throw new Error(`Error fetching paginated withdrawals: ${error.message}`);
+    }
+  }
+
+  async countAllWithdrawals(filter = {}) {
+    try {
+      // Ensure we only count withdrawals
+      const finalFilter = { ...filter, type: "withdrawal" };
+      return await TransactionModel.countDocuments(finalFilter);
+    } catch (error) {
+      throw new Error(`Error counting withdrawals: ${error.message}`);
+    }
+  }
+  async getTransactions(query, skip, limit) {
+    try {
+      // Handle uploadedBy and collectedBy with partial matching
+      if (query.uploadedBy) {
+        query.uploadedBy = {
+          $regex: query.uploadedBy,
+          $options: "i",
+        };
+      }
+      if (query.collectedBy) {
+        query.collectedBy = {
+          $regex: query.collectedBy,
+          $options: "i",
+        };
+      }
+
+      return await TransactionModel.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+    } catch (error) {
+      throw new Error("Error fetching transactions: " + error.message);
+    }
+  }
   async countTransactions(query) {
     try {
       return await TransactionModel.countDocuments(query);
@@ -258,7 +279,7 @@ async countAllWithdrawals(filter = {}) {
       }
     } catch (error) {
       throw new Error(
-        `Error calculating total deposit amount: ${error.message}`
+        `Error calculating total deposit amount: ${error.message}`,
       );
     }
   }
@@ -288,7 +309,7 @@ async countAllWithdrawals(filter = {}) {
       }
     } catch (error) {
       throw new Error(
-        `Error retrieving total deposit transactions by cash by payment date: ${error.message}`
+        `Error retrieving total deposit transactions by cash by payment date: ${error.message}`,
       );
     }
   }
@@ -317,7 +338,7 @@ async countAllWithdrawals(filter = {}) {
       }
     } catch (error) {
       throw new Error(
-        `Error retrieving total withdrawal transactions by cash by payment date: ${error.message}`
+        `Error retrieving total withdrawal transactions by cash by payment date: ${error.message}`,
       );
     }
   }
@@ -348,7 +369,7 @@ async countAllWithdrawals(filter = {}) {
       }
     } catch (error) {
       throw new Error(
-        `Error retrieving total withdrawal transactions by transfer by payment date: ${error.message}`
+        `Error retrieving total withdrawal transactions by transfer by payment date: ${error.message}`,
       );
     }
   }
@@ -367,7 +388,7 @@ async countAllWithdrawals(filter = {}) {
       return transactions;
     } catch (error) {
       throw new Error(
-        `Error retrieving all withdrawal transactions by payment date: ${error.message}`
+        `Error retrieving all withdrawal transactions by payment date: ${error.message}`,
       );
     }
   }
@@ -393,7 +414,7 @@ async countAllWithdrawals(filter = {}) {
       // Calculate the total deposit amount
       const totalDepositAmount = transferDepositLoans.reduce(
         (total, loan) => total + loan.amount,
-        0
+        0,
       );
 
       return totalDepositAmount;
@@ -401,19 +422,19 @@ async countAllWithdrawals(filter = {}) {
       throw error;
     }
   }
-async getAllTransactionsByCustomer(customerId) {
-  try {
-    const transactions = await TransactionModel.find({ 
-      customer: customerId 
-    }).sort({ createdAt: -1 }); // ✅ Correct field name + sorting
+  async getAllTransactionsByCustomer(customerId) {
+    try {
+      const transactions = await TransactionModel.find({
+        customer: customerId,
+      }).sort({ createdAt: -1 }); // ✅ Correct field name + sorting
 
-    return transactions;
-  } catch (error) {
-    throw new Error(
-      `Error retrieving transactions for customer: ${error.message}`
-    );
+      return transactions;
+    } catch (error) {
+      throw new Error(
+        `Error retrieving transactions for customer: ${error.message}`,
+      );
+    }
   }
-}
   async getAllTransactions() {
     try {
       console.log("Hello World!");
@@ -434,7 +455,7 @@ async getAllTransactionsByCustomer(customerId) {
       return cashTransactions;
     } catch (error) {
       throw new Error(
-        `Error retrieving transactions by cash: ${error.message}`
+        `Error retrieving transactions by cash: ${error.message}`,
       );
     }
   }
@@ -450,21 +471,20 @@ async getAllTransactionsByCustomer(customerId) {
       return transactions;
     } catch (error) {
       throw new Error(
-        `Error retrieving paginated transactions by collector: ${error.message}`
+        `Error retrieving paginated transactions by collector: ${error.message}`,
       );
     }
   }
 
-
-async countAllTransactionsByCollector(collectedBy) {
-  try {
-    return await TransactionModel.countDocuments({ collectedBy });
-  } catch (error) {
-    throw new Error(
-      `Error counting transactions by collector: ${error.message}`
-    );
+  async countAllTransactionsByCollector(collectedBy) {
+    try {
+      return await TransactionModel.countDocuments({ collectedBy });
+    } catch (error) {
+      throw new Error(
+        `Error counting transactions by collector: ${error.message}`,
+      );
+    }
   }
-}
   async getAllTransactionsByTransfer() {
     try {
       // Query the database for all transactions with modeOfPayment set to 'transfer'
@@ -475,7 +495,7 @@ async countAllTransactionsByCollector(collectedBy) {
       return transferTransactions;
     } catch (error) {
       throw new Error(
-        `Error retrieving transactions by transfer: ${error.message}`
+        `Error retrieving transactions by transfer: ${error.message}`,
       );
     }
   }

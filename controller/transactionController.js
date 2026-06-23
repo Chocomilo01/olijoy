@@ -11,6 +11,7 @@ class TransactionController {
     console.log("CREATE DEPOSIT CALLED");
     console.log("BODY:", req.body);
     console.log("================================");
+
     const session = await mongoose.startSession();
 
     try {
@@ -25,6 +26,7 @@ class TransactionController {
         modeOfPayment,
         paymentDate,
         name,
+        forceCreate = false,
       } = req.body;
 
       const customer = await CustomerService.fetchOne(
@@ -35,17 +37,43 @@ class TransactionController {
 
       if (!customer) {
         await session.abortTransaction();
+
         return res.status(404).json({
           success: false,
           message: "Customer not found",
         });
       }
 
+      const depositAmount = Number(amount);
+
+      // ==================================================
+      // DUPLICATE CHECK
+      // ==================================================
+      if (!forceCreate) {
+        const existingTransaction = await TransactionService.fetchOne({
+          customer: customerId,
+          amount: depositAmount,
+          type: "deposit",
+          paymentDate: new Date(paymentDate),
+        });
+
+        if (existingTransaction) {
+          await session.abortTransaction();
+
+          return res.status(409).json({
+            success: false,
+            duplicate: true,
+            message: `A deposit of ₦${depositAmount.toLocaleString(
+              "en-NG",
+            )} has already been recorded for this customer on this date. Do you want to continue?`,
+            existingTransaction,
+          });
+        }
+      }
+
       const userId = req.body.id;
       const firstName = req.body.firstName;
       const middleName = req.body.middleName;
-
-      const depositAmount = Number(amount);
 
       customer.accountBalance += depositAmount;
 
@@ -71,10 +99,8 @@ class TransactionController {
         { session },
       );
 
-      // Commit transaction first
       await session.commitTransaction();
 
-      // Build SMS message
       const shortName = customer.name?.split(" ").slice(0, 4).join(" ");
 
       const message = `Acct: ${customer.accountNumber.replace("OLJ-", "")}.
@@ -83,7 +109,6 @@ DESC:${shortName} to Olijoy
 Avail Bal: NGN${Number(updatedBalance).toLocaleString("en-NG")}.
 Thank you for banking with OLIJOY.`;
 
-      // Debug logs
       console.log("===== DEPOSIT REQUEST =====");
       console.log(req.body);
 
@@ -94,10 +119,9 @@ Thank you for banking with OLIJOY.`;
       console.log("Balance:", updatedBalance);
       console.log("Message:", message);
 
-      // Send SMS
-      
       try {
         console.log("CALLING SMS SERVICE...");
+
         const smsResult = await sendSMS(customer.customersPhoneNo, message);
 
         console.log("SMS SUCCESS:", smsResult);
@@ -120,6 +144,8 @@ Thank you for banking with OLIJOY.`;
       });
     } catch (error) {
       await session.abortTransaction();
+
+      console.error("CREATE DEPOSIT ERROR:", error);
 
       return res.status(500).json({
         success: false,
