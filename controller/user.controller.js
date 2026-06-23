@@ -21,6 +21,12 @@ exports.registerUser = async (req, res) => {
         message: "First Name is required",
       });
 
+       if (!bvn)
+      return res.status(400).json({
+        success: false,
+        message: "bvn is required",
+      });
+
     if (!lastName)
       return res.status(400).json({
         success: false,
@@ -50,6 +56,12 @@ exports.registerUser = async (req, res) => {
         success: false,
         message: "Password must be at least 6 characters",
       });
+
+      if (bvn.length < 10)
+        return res.status(400).json({
+          success: false,
+          message: "BVN must be at least 10 characters",
+        });
 
     // Duplicate checks
     const existingEmail = await userService.findOne({ email });
